@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://luxor-store.vercel.app';
+const BOT_TOKEN =
+  process.env.TELEGRAM_BOT_TOKEN ||
+  process.env.TELEGRAM__T_TOKEN ||
+  '8719208102:AAGcxrZ6CKXmHjt5yCCJpxWS2NJQQ7cIiiE';
+
+const APP_URL =
+  process.env.NEXT_PUBLIC_APP_URL ||
+  'https://mini-app-dokon.vercel.app';
 
 interface TelegramUpdate {
   update_id: number;
@@ -62,16 +68,15 @@ export async function POST(req: NextRequest) {
           : APP_URL;
 
         const welcomeText = `
-Assalomu alaykum, <b>${escapeHtml(firstName)}</b>! ✨
+Assalomu alaykum, <b>${escapeHtml(firstName)}</b>! 👋
 
-<b>LUXOR</b> rasmiy do'koniga xush kelibsiz.
-Eng sara smart-gadjetlar, zamonaviy kiyim-kechaklar va aksessuarlarni qulay narxlarda xarid qiling.
+<b>LUXOR</b> rasmiy do‘koniga xush kelibsiz! ✨
+Eng sara smart-gadjetlar va premium tovarlar kafolatlangan sifat bilan siz uchun tayyor.
 
-📦 Butun O'zbekiston bo'ylab 1 kunda yetkazib berish
-💳 To'lovni tovar yetib borganda qabul qilasiz
-🛡 100% original va sifat kafolati
+🚚 <b>Yetkazib berish:</b> Butun O‘zbekiston bo‘ylab 1 kunda (bepul)
+💳 <b>To‘lov:</b> Tovarni qabul qilib olganda
 
-Do'konni ochish uchun quyidagi tugmani bosing:
+Katalogni ko‘rish va xarid qilish uchun pastdagi tugmani bosing: 👇
 `.trim();
 
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
@@ -85,14 +90,8 @@ Do'konni ochish uchun quyidagi tugmani bosing:
               inline_keyboard: [
                 [
                   {
-                    text: '🛍 LUXOR Doʻkonini Ochish',
+                    text: '🛍 Do‘konni Ochish ✨',
                     web_app: { url: webAppUrl },
-                  },
-                ],
-                [
-                  {
-                    text: '📞 Aloqa / Yordam',
-                    url: 'https://t.me/luxor_support',
                   },
                 ],
               ],
@@ -111,7 +110,7 @@ Do'konni ochish uchun quyidagi tugmani bosing:
 
       if (chatId && messageId && data.startsWith('status_')) {
         const parts = data.split('_');
-        const statusType = parts[1]; // accept | shipping
+        const statusType = parts[1];
         const orderId = parts[2] || '';
 
         const statusLabel =
@@ -131,7 +130,7 @@ Do'konni ochish uchun quyidagi tugmani bosing:
     return NextResponse.json({ ok: true });
   } catch (err) {
     console.error('Error handling Telegram bot webhook:', err);
-    return NextResponse.json({ ok: true }); // Always return 200 OK to Telegram
+    return NextResponse.json({ ok: true });
   }
 }
 
@@ -140,5 +139,7 @@ function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }

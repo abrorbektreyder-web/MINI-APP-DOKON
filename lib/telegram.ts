@@ -1,7 +1,11 @@
 import { OrderSubmission } from './types';
 
-const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID;
+const BOT_TOKEN =
+  process.env.TELEGRAM_BOT_TOKEN ||
+  process.env.TELEGRAM__T_TOKEN ||
+  '8719208102:AAGcxrZ6CKXmHjt5yCCJpxWS2NJQQ7cIiiE';
+
+const ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID || '6377333240';
 
 /**
  * Sends a message via Telegram Bot API

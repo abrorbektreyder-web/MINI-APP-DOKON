@@ -4,6 +4,7 @@ import React from 'react';
 import { Heart, Star, Plus } from 'lucide-react';
 import { Product } from '@/lib/types';
 import { triggerHaptic } from '@/lib/telegram-client';
+import { formatPrice } from '@/lib/format';
 
 interface ProductCardProps {
   product: Product;
@@ -94,12 +95,12 @@ export function ProductCard({
         {/* Price & Action button */}
         <div className="mt-auto flex items-center justify-between pt-1 border-t border-zinc-100 dark:border-zinc-800">
           <div>
-            <div className="text-xs font-black text-zinc-950 dark:text-zinc-50">
-              {product.price.toLocaleString('uz-UZ')} <span className="text-[10px] font-normal text-zinc-500">so'm</span>
+            <div className="text-xs font-black text-zinc-950 dark:text-zinc-50" suppressHydrationWarning>
+              {formatPrice(product.price)} <span className="text-[10px] font-normal text-zinc-500">so'm</span>
             </div>
             {product.oldPrice && (
-              <div className="text-[10px] text-zinc-400 line-through">
-                {product.oldPrice.toLocaleString('uz-UZ')} so'm
+              <div className="text-[10px] text-zinc-400 line-through" suppressHydrationWarning>
+                {formatPrice(product.oldPrice)} so'm
               </div>
             )}
           </div>

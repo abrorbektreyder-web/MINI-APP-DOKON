@@ -4,6 +4,7 @@ import React from 'react';
 import { X, Trash2, ShoppingBag, ArrowRight, Truck } from 'lucide-react';
 import { CartItem } from '@/lib/types';
 import { triggerHaptic } from '@/lib/telegram-client';
+import { formatPrice } from '@/lib/format';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -110,8 +111,8 @@ export function CartDrawer({
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-black text-zinc-950 dark:text-zinc-50">
-                      {(item.product.price * item.quantity).toLocaleString('uz-UZ')} so'm
+                    <span className="text-xs font-black text-zinc-950 dark:text-zinc-50" suppressHydrationWarning>
+                      {formatPrice(item.product.price * item.quantity)} so'm
                     </span>
 
                     {/* Stepper */}
@@ -165,8 +166,8 @@ export function CartDrawer({
             </div>
             <div className="flex items-center justify-between mb-3 text-sm font-black text-zinc-900 dark:text-zinc-100">
               <span>Jami toʻlov:</span>
-              <span className="text-lg">
-                {totalAmount.toLocaleString('uz-UZ')} so'm
+              <span className="text-lg" suppressHydrationWarning>
+                {formatPrice(totalAmount)} so'm
               </span>
             </div>
 

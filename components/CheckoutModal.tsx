@@ -5,6 +5,7 @@ import { X, CheckCircle2, ShieldCheck, CreditCard, Banknote, Loader2 } from 'luc
 import { CartItem, OrderSubmission } from '@/lib/types';
 import { UZBEKISTAN_REGIONS } from '@/data/regions';
 import { triggerHaptic, getTelegramUser, getTelegramInitData } from '@/lib/telegram-client';
+import { formatPrice } from '@/lib/format';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -303,8 +304,8 @@ export function CheckoutModal({
           <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 space-y-1 text-xs">
             <div className="flex justify-between text-zinc-500">
               <span>Mahsulotlar ({items.length} xil):</span>
-              <span className="font-semibold text-zinc-800 dark:text-zinc-200">
-                {totalAmount.toLocaleString('uz-UZ')} so'm
+              <span className="font-semibold text-zinc-800 dark:text-zinc-200" suppressHydrationWarning>
+                {formatPrice(totalAmount)} so'm
               </span>
             </div>
             <div className="flex justify-between text-zinc-500">
@@ -313,7 +314,7 @@ export function CheckoutModal({
             </div>
             <div className="flex justify-between pt-2 border-t border-zinc-200 dark:border-zinc-700 text-sm font-black text-zinc-900 dark:text-zinc-100">
               <span>Jami summa:</span>
-              <span>{totalAmount.toLocaleString('uz-UZ')} so'm</span>
+              <span suppressHydrationWarning>{formatPrice(totalAmount)} so'm</span>
             </div>
           </div>
 

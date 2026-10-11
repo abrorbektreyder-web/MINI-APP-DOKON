@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { X, Heart, Star, ShoppingBag, Zap, ChevronLeft, ChevronRight, ShieldCheck, Truck, Check } from 'lucide-react';
 import { Product } from '@/lib/types';
 import { triggerHaptic } from '@/lib/telegram-client';
+import { formatPrice } from '@/lib/format';
 
 interface ProductDetailsModalProps {
   product: Product | null;
@@ -140,12 +141,12 @@ export function ProductDetailsModal({
 
             {/* Price block */}
             <div className="flex items-baseline gap-3 mb-5">
-              <span className="text-2xl font-black text-zinc-950 dark:text-zinc-50">
-                {product.price.toLocaleString('uz-UZ')} <span className="text-sm font-semibold text-zinc-500">so'm</span>
+              <span className="text-2xl font-black text-zinc-950 dark:text-zinc-50" suppressHydrationWarning>
+                {formatPrice(product.price)} <span className="text-sm font-semibold text-zinc-500">so'm</span>
               </span>
               {product.oldPrice && (
-                <span className="text-sm text-zinc-400 line-through">
-                  {product.oldPrice.toLocaleString('uz-UZ')} so'm
+                <span className="text-sm text-zinc-400 line-through" suppressHydrationWarning>
+                  {formatPrice(product.oldPrice)} so'm
                 </span>
               )}
               {product.discountPercent && (

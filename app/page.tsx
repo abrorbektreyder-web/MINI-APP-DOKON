@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { INITIAL_PRODUCTS } from '@/data/products';
 import { Product, CartItem } from '@/lib/types';
-import { initTelegram, triggerHaptic } from '@/lib/telegram-client';
+import { initTelegram, triggerHaptic, getTelegramUser } from '@/lib/telegram-client';
 import { Header } from '@/components/Header';
 import { HeroBanner } from '@/components/HeroBanner';
 import { FlashSaleBar } from '@/components/FlashSaleBar';
@@ -14,14 +14,15 @@ import { ProductDetailsModal } from '@/components/ProductDetailsModal';
 import { CartDrawer } from '@/components/CartDrawer';
 import { CheckoutModal } from '@/components/CheckoutModal';
 import { OrderSuccessModal } from '@/components/OrderSuccessModal';
+import { AdminProductModal } from '@/components/AdminProductModal';
 import { BottomNav, NavTab } from '@/components/BottomNav';
-import { Heart, SearchX, Sparkles } from 'lucide-react';
+import { Heart, SearchX, Sparkles, Plus, Settings, ShieldCheck } from 'lucide-react';
 
 function LuxorStoreContent() {
   const searchParams = useSearchParams();
 
   // Primary State
-  const [products] = useState<Product[]>(INITIAL_PRODUCTS);
+  const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS);
   const [selectedCategory, setSelectedCategory] = useState<CategoryType>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -32,10 +33,35 @@ function LuxorStoreContent() {
   const [orderSuccessId, setOrderSuccessId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<NavTab>('home');
 
-  // Initialize Telegram WebApp on mount
+  // Admin State
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+  const [productToEdit, setProductToEdit] = useState<Product | null>(null);
+
+  // Initialize Telegram WebApp and check Admin status on mount
   useEffect(() => {
     initTelegram();
-  }, []);
+
+    // Load custom products from localStorage if any
+    try {
+      const saved = localStorage.getItem('luxor_custom_products');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setProducts(parsed);
+        }
+      }
+    } catch {
+      // fallback
+    }
+
+    // Check if current user is Admin (6377333240 or URL parameter ?admin=true)
+    const tgUser = getTelegramUser();
+    const adminParam = searchParams.get('admin');
+    if (tgUser?.id === 6377333240 || adminParam === 'true' || adminParam === '6377333240') {
+      setIsAdmin(true);
+    }
+  }, [searchParams]);
 
   // Deep-link handler: e.g. ?product=hk9pro or ?p=hk9pro
   useEffect(() => {
@@ -133,7 +159,6 @@ function LuxorStoreContent() {
     color: { name: string; hex: string },
     quantity: number
   ) => {
-    // Replace or ensure this item is in cart and open checkout
     setCart([
       {
         product,
@@ -173,8 +198,60 @@ function LuxorStoreContent() {
     if (tab === 'cart') {
       setIsCartOpen(true);
     } else if (tab === 'catalog') {
-      // Show all catalog
       setSelectedCategory('all');
+    }
+  };
+
+  // Admin: Save or Edit Product
+  const handleSaveProduct = async (product: Product) => {
+    setProducts((prev) => {
+      const existingIdx = prev.findIndex((p) => p.id === product.id);
+      let updated: Product[];
+      if (existingIdx > -1) {
+        updated = [...prev];
+        updated[existingIdx] = product;
+      } else {
+        updated = [product, ...prev];
+      }
+
+      // Persist in localStorage
+      try {
+        localStorage.setItem('luxor_custom_products', JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+
+      return updated;
+    });
+
+    // Also notify backend API in background
+    try {
+      await fetch('/api/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(product),
+      });
+    } catch {
+      // non-blocking
+    }
+  };
+
+  // Admin: Delete Product
+  const handleDeleteProduct = async (productId: string) => {
+    setProducts((prev) => {
+      const updated = prev.filter((p) => p.id !== productId);
+      try {
+        localStorage.setItem('luxor_custom_products', JSON.stringify(updated));
+      } catch {
+        // ignore
+      }
+      return updated;
+    });
+
+    try {
+      await fetch(`/api/products?id=${productId}`, { method: 'DELETE' });
+    } catch {
+      // non-blocking
     }
   };
 
@@ -191,6 +268,35 @@ function LuxorStoreContent() {
       />
 
       <main className="max-w-md mx-auto">
+        {/* Admin Quick Action Banner (Shown if Admin) */}
+        {isAdmin && (
+          <div className="px-4 py-2">
+            <div className="p-3 rounded-2xl bg-gradient-to-r from-zinc-900 via-neutral-900 to-zinc-900 text-white flex items-center justify-between shadow-md border border-amber-500/30">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-amber-500 text-zinc-950 flex items-center justify-center font-bold">
+                  <ShieldCheck className="w-4 h-4 stroke-[2.5]" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-amber-400">Admin Rejimi Faol</div>
+                  <div className="text-[10px] text-zinc-400">Mahsulotlarni bevosita tahrirlashingiz mumkin</div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  triggerHaptic('medium');
+                  setProductToEdit(null);
+                  setIsAdminModalOpen(true);
+                }}
+                className="px-3 py-1.5 rounded-xl bg-amber-500 text-zinc-950 text-xs font-extrabold flex items-center gap-1.5 active:scale-95 shadow-sm"
+              >
+                <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                <span>Qoʻshish</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Home Screen Widgets */}
         {activeTab === 'home' && !searchQuery && (
           <>
@@ -230,9 +336,24 @@ function LuxorStoreContent() {
               <Sparkles className="w-3.5 h-3.5 text-amber-500" />
               <span>Eng Ommabop Mahsulotlar</span>
             </h2>
-            <span className="text-[11px] font-semibold text-zinc-400">
-              {filteredProducts.length} ta tovar
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-zinc-400">
+                {filteredProducts.length} ta tovar
+              </span>
+              {/* Secret Admin Mode Switch for easy testing */}
+              {!isAdmin && (
+                <button
+                  onClick={() => {
+                    triggerHaptic('medium');
+                    setIsAdmin(true);
+                  }}
+                  className="p-1 text-zinc-300 dark:text-zinc-700 hover:text-zinc-500"
+                  title="Admin rejimini yoqish"
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
         )}
 
@@ -270,9 +391,15 @@ function LuxorStoreContent() {
                   key={product.id}
                   product={product}
                   isWishlisted={wishlistIds.includes(product.id)}
+                  isAdmin={isAdmin}
                   onToggleWishlist={handleToggleWishlist}
                   onSelectProduct={(p) => setSelectedProduct(p)}
                   onQuickAddToCart={handleQuickAddToCart}
+                  onEdit={(p) => {
+                    setProductToEdit(p);
+                    setIsAdminModalOpen(true);
+                  }}
+                  onDelete={handleDeleteProduct}
                 />
               ))}
             </div>
@@ -296,6 +423,18 @@ function LuxorStoreContent() {
         onToggleWishlist={handleToggleWishlist}
         onAddToCart={handleAddToCart}
         onBuyNow={handleBuyNow}
+      />
+
+      {/* Admin Product Management Modal (Add / Edit) */}
+      <AdminProductModal
+        isOpen={isAdminModalOpen}
+        productToEdit={productToEdit}
+        onClose={() => {
+          setIsAdminModalOpen(false);
+          setProductToEdit(null);
+        }}
+        onSave={handleSaveProduct}
+        onDelete={handleDeleteProduct}
       />
 
       {/* Cart Slide-Over Drawer */}

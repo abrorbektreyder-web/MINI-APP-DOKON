@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Heart, Star, Plus } from 'lucide-react';
+import { Heart, Star, Plus, Edit2, Trash2 } from 'lucide-react';
 import { Product } from '@/lib/types';
 import { triggerHaptic } from '@/lib/telegram-client';
 import { formatPrice } from '@/lib/format';
@@ -9,17 +9,23 @@ import { formatPrice } from '@/lib/format';
 interface ProductCardProps {
   product: Product;
   isWishlisted: boolean;
+  isAdmin?: boolean;
   onToggleWishlist: (product: Product) => void;
   onSelectProduct: (product: Product) => void;
   onQuickAddToCart: (product: Product) => void;
+  onEdit?: (product: Product) => void;
+  onDelete?: (productId: string) => void;
 }
 
 export function ProductCard({
   product,
   isWishlisted,
+  isAdmin = false,
   onToggleWishlist,
   onSelectProduct,
   onQuickAddToCart,
+  onEdit,
+  onDelete,
 }: ProductCardProps) {
   return (
     <div className="group relative flex flex-col rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800/80 overflow-hidden shadow-sm hover:shadow-md transition-all">
@@ -68,6 +74,36 @@ export function ProductCard({
         >
           <Heart className={`w-4 h-4 ${isWishlisted ? 'fill-current' : ''}`} />
         </button>
+
+        {/* Admin Quick Action Strip */}
+        {isAdmin && (
+          <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between gap-1.5 z-20">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                triggerHaptic('medium');
+                onEdit?.(product);
+              }}
+              className="flex-1 py-1 px-2 rounded-lg bg-zinc-900/95 text-white text-[10px] font-bold flex items-center justify-center gap-1 backdrop-blur-md shadow-md hover:bg-zinc-800 active:scale-95 transition-all"
+            >
+              <Edit2 className="w-3 h-3" />
+              <span>Tahrirlash</span>
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                triggerHaptic('heavy');
+                if (confirm(`${product.title} mahsulotini oʻchirmoqchimisiz?`)) {
+                  onDelete?.(product.id);
+                }
+              }}
+              className="p-1 rounded-lg bg-rose-600/95 text-white text-[10px] font-bold backdrop-blur-md shadow-md hover:bg-rose-700 active:scale-95 transition-all"
+              aria-label="Oʻchirish"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Product Content Details */}

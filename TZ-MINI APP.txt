@@ -1,0 +1,177 @@
+# 🚀 TEXNIK TOPSHIRIQ (PRD): Zamonaviy Telegram Mini App & E-Commerce Savdo Tizimi
+
+## 📌 1. Loyihaning Maqsadi va Umumiy Kontekst
+Ushbu loyiha Instagram Ads, OLX va boshqa reklama kanallaridan kelayotgan mijozlar oqimini Telegram platformasi ichida **yuqori konversiya bilan savdoga aylantiruvchi (conversion-oriented)** to'liq avtomatlashtirilgan zamonaviy ekotizimdir.
+
+Xaridor reklama orqali o'tganda hech qanday tashqi brauzer yoki murakkab ro'yxatdan o'tishlarsiz, Telegram Mini App do'koni ichida tovarlarni tanlaydi, savatga qo'shadi, ma'lumotlarini qoldiradi va 1 ta tugma bilan buyurtma beradi. Barcha ma'lumotlar avtomatik tarzda **Google Sheets (CRM)** ga tushadi va **Do'kon Admini / Guruhiga** real vaqtda xabar qilinadi.
+
+---
+
+## 🏗️ 2. Arxitektura va Zamonaviy Texnologiyalar Steki
+
+Loyiha **Fullstack Monorepo** tamoyili asosida, eng tezkor va barqaror texnologiyalar yordamida **Vercel Serverless** infratuzilmasiga moslab quriladi:
+
+| Qatlam | Tanlangan Texnologiya | Nega aynan shu? (Asos) |
+| :--- | :--- | :--- |
+| **Framework** | **Next.js (App Router) + TypeScript** | Frontend va Backend API yagona platformada bo'ladi. CORS muammosi bo'lmaydi, Vercel uchun 100% nativ. |
+| **Frontend UI** | **React + Tailwind CSS + Lucide Icons** | Zamonaviy, minimalistik, iOS/Telegram Native interfeys dizayni. |
+| **TMA Integratsiya** | **Telegram Web App SDK (`telegram-web-app.js`)** | Haptic Feedback (vibratsiya), Telegram Rang mavzusi (Dark/Light), Viewport boshqaruvi. |
+| **State Management**| **Zustand / React Context** | Savatcha (Cart), tovarlar soni va xaridor kiritgan ma'lumotlarni xotirada tezkor saqlash. |
+| **Backend API** | **Next.js Serverless Route Handlers (`/api/...`)** | 0 ms server to'xtab qolish xavfi, yuqori yuklamalarga chidamli, tezkor javob. |
+| **Bot Webhook** | **GrammY / Telegraf.js (Node.js)** | Python Aiogram'ga nisbatan Vercel-da "Cold Start" kechikishi yo'q (juda yengil va tezkor). |
+| **CRM & Baza** | **Google Sheets API v4 (`google-spreadsheet`)** | Do'kon egasi uchun tushunarli, bepul, qo'shimcha admin panel talab qilmaydigan qulay CRM. |
+| **Xavfsizlik** | **Crypto HMAC-SHA256 (`initData` validation) + Zod** | Telegram orqali kelgan so'rovlarning haqiqiyligini tekshirish, spam va soxta botlardan himoya. |
+
+---
+
+## 🚶‍♂️ 3. Mijoz Yo'li va Interaktiv Foydalanuvchi Tajribasi (User Flow & UX)
+
+1. **Reklama va Deep-link:**
+   * Mijoz Instagram Stories/Postdagi havolani bosadi: `t.me/BizningBot?start=p_hk9pro` (yoki umumiy katalog uchun: `t.me/BizningBot?start=catalog`).
+2. **Telegram Bot kutib olishi:**
+   * Bot `/start` komandasidagi `start` parametrini ajratib oladi (`p_hk9pro`).
+   * Xush kelibsiz xabarini va maxsus **Inline Web App** tugmasini chiqaradi: `🛍 Do'konga kirish` (havola parametrida mahsulot ID si uzatiladi).
+3. **Zamonaviy Mini App Vitrinasi:**
+   * Mini App to'liq ekran rejimida, Telegram mavzusiga (Dark/Light) avtomatik moslashib ochiladi.
+   * Agar deep-link bo'lsa, to'g'ridan-to'g'ri o'sha tovarning to'liq sahifasi (Product Modal) ochiladi.
+   * Tovar rasmlari (Swipe karusel), narxi, chegirma foizi, xususiyatlari va zaxira holati ko'rinadi.
+4. **Savat (Cart) & Haptic Feedback:**
+   * Mijoz tovar yoki variantni tanlab "Savatga qo'shish"ni bosganda, Telegram haptik vibratsiyasi (`impactOccurred('medium')`) ishga tushadi.
+   * Savatchada tovar sonini oshirish/kamaytirish, umumiy summani ko'rish mumkin.
+5. **Checkout (Buyurtmani Rasmiylashtirish):**
+   * Xaridor quyidagi maydonlarni to'ldiradi:
+     * **Ism-Familiya:** (Majburiy)
+     * **Telefon raqami:** `+998 (__) ___-__-__` maskasi bilan avtomatik tekshiruv.
+     * **Yetkazib berish viloyati:** O'zbekistonning 14 ta hududi tanlanadigan dropdown.
+     * **Manzil / Mo'ljal:** Kiritish maydoni.
+     * **To'lov usuli:** Naqd / Karta orqali yetkazilganda (COD).
+6. **Buyurtmani Yuborish (Xavfsiz API orqali):**
+   * *Eslatma:* Telegram Inline tugmalar orqali ochilganda `tg.sendData()` ishlamasligi hisobga olingan holda, barcha ma'lumotlar to'g'ridan-to'g'ri `/api/order` endpointiga `fetch` orqali POST qilinadi.
+   * So'rov bilan birga xavfsizlik uchun `Telegram.WebApp.initData` uzatiladi.
+7. **Jarayonni Yakunlash:**
+   * Muvaffaqiyatli buyurtmadan so'ng `tg.HapticFeedback.notificationOccurred('success')` chalinadi.
+   * Chiroyli "Rahmat! Buyurtmangiz qabul qilindi" ekrani chiqadi va 2 soniyadan so'ng Mini App yopiladi.
+   * Bot orqali mijozning shaxsiy chatiga rasmiy xabar va buyurtma cheki boradi.
+
+---
+
+## 📊 4. Ma'lumotlar Bazasi va CRM Strukturasi (Google Sheets)
+
+Google Jadval 2 ta varaqdan (Sheet) iborat bo'ladi:
+
+### Varaq 1: `Buyurtmalar` (Orders)
+| Ustun | Nomi | Izoh / Format |
+| :--- | :--- | :--- |
+| **A** | `Sana va Vaqt` | `DD.MM.YYYY HH:mm:ss` (Toshkent vaqti) |
+| **B** | `Buyurtma ID` | `#ORD-7482` (Unikal tasodifiy generator) |
+| **C** | `Mijoz Ismi` | Xaridor kiritgan ism |
+| **D** | `Telefon Raqami` | `+998 90 123 45 67` |
+| **E** | `Viloyat va Manzil`| `Toshkent sh., Chilonzor 9-mavze` |
+| **F** | `Buyurtma Tarkibi` | `HK9 Pro Smart Watch (1 dona), Qo'shimcha kamar (2 dona)` |
+| **G** | `Jami Summa` | `450,000 so'm` |
+| **H** | `Telegram Username`| `@mijoz_user` (yoki Telegram ID) |
+| **I** | `Status` | `Yangi` (Keyinchalik: `Qabul qilindi`, `Yetkazildi`, `Bekor`) |
+
+### Varaq 2: `Mahsulotlar` (Products Catalog - Dinamik boshqaruv)
+Admin kodni o'zgartirmasdan, tovarlarni aynan shu varaq orqali qo'sha oladi:
+* `id` | `title` | `price` | `old_price` | `image_url` | `description` | `in_stock` (true/false)
+
+---
+
+## 🔔 5. Admin va Xaridor Bildirishnomalari (Telegram Bot)
+
+### Admin Guruhiga Boradigan Xabar (Real-time):
+```html
+🔥 YANGI BUYURTMA: #ORD-7482
+━━━━━━━━━━━━━━━━━━
+👤 Xaridor: Dilshod Rahimov
+📞 Tel: +998 90 123 45 67
+📍 Manzil: Samarqand viloyati, Registon ko'chasi 14
+💬 Telegram: @dilshod_r
+
+📦 Tovarlar:
+• HK9 Pro Smart Watch — 1 dona (350,000 so'm)
+• Magnitli zaryadlovchi — 1 dona (50,000 so'm)
+
+💰 Jami to'lov: 400,000 so'm
+━━━━━━━━━━━━━━━━━━
+Holat: 🟡 Yangi buyurtma
+```
+*Tugmalar (Inline Buttons):* `[✅ Qabul qilindi]` `[❌ Bekor qilindi]`
+
+### Xaridorga Boradigan Xabar:
+```html
+Hurmatli Dilshod Rahimov!
+Sizning #ORD-7482 raqamli buyurtmangiz muvaffaqiyatli qabul qilindi. 
+Tez orada operatorimiz siz bilan bog'lanadi!
+```
+
+---
+
+## 🗂️ 6. Loyiha Papkalarining Mukammal Strukturasi (Next.js Monorepo)
+
+```
+insta-mini-app-savdo/
+├── app/
+│   ├── api/
+│   │   ├── bot/
+│   │   │   └── route.ts          # Telegram Webhook (Bot buyruqlari, /start, deep-link)
+│   │   ├── order/
+│   │   │   └── route.ts          # Buyurtmani qabul qilish, initData tekshirish, CRM ga yozish
+│   │   └── products/
+│   │       └── route.ts          # Mahsulotlar ro'yxatini uzatish (Google Sheets yoki JSON dan)
+│   ├── globals.css               # Tailwind CSS va Telegram Theme o'zgaruvchilari
+│   ├── layout.tsx                # Telegram WebApp scriptini ulovchi asosiy layout
+│   └── page.tsx                  # Mini App asosiy vitrina sahifasi
+├── components/
+│   ├── ui/                       # Qayta ishlatiluvchi UI (Button, Input, Badge, Modal)
+│   ├── Header.tsx                # Mini App qalpog'i (Kompaniya logosi, Savat icon)
+│   ├── ProductCard.tsx           # Tovar kartochkasi (Rasm, narx, tezkor qo'shish)
+│   ├── ProductModal.tsx          # Tovar tafsilotlari (Deep-link ochganda chiqadigan modal)
+│   ├── CartDrawer.tsx            # Savatcha darchasi (Tovarlar ro'yxati, soni, hisob-kitob)
+│   └── CheckoutModal.tsx         # Buyurtma berish formasi (Telefon maskasi, viloyatlar)
+├── data/
+│   ├── products.json             # Boshlang'ich tovarlar zaxirasi (Offline/Fallback)
+│   └── regions.ts                # O'zbekistonning 14 ta viloyat va hududlari ro'yxati
+├── lib/
+│   ├── google-sheets.ts          # Google Sheets API bilan xavfsiz ulanish va yozish
+│   ├── telegram.ts               # Telegram Bot API mijozi (xabarlar jo'natish)
+│   ├── validate-telegram.ts      # initData HMAC-SHA256 xavfsizlik tekshiruvi
+│   └── types.ts                  # TypeScript interfeyslari (Product, Order, CartItem)
+├── public/                       # Statik resurslar, ikonlar, rasmlar
+├── .env.example                  # Muhit o'zgaruvchilari namunasi
+├── package.json
+├── tailwind.config.ts
+├── tsconfig.json
+└── vercel.json                   # Vercel deployment va crons sozlamalari
+```
+
+---
+
+## 🔐 7. Xavfsizlik va Atrof-Muhit O'zgaruvchilari (.env)
+
+Loyiha xavfsizligi quyidagi o'zgaruvchilar orqali ta'minlanadi:
+```bash
+# Telegram Bot Sozlamalari
+TELEGRAM_BOT_TOKEN="1234567890:ABCdefGhIJKlmNoPQRstuVWXyz"
+TELEGRAM_ADMIN_CHAT_ID="-1001234567890"  # Admin shaxsiy ID yoki Guruh ID
+
+# Vercel va Loyiha Domeni
+NEXT_PUBLIC_APP_URL="https://sizning-dovon-nomingiz.vercel.app"
+
+# Google Sheets API Sozlamalari
+GOOGLE_SHEET_ID="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms"
+GOOGLE_SERVICE_ACCOUNT_EMAIL="mini-app-crm@loyihangiz.iam.gserviceaccount.com"
+GOOGLE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgk...-----END PRIVATE KEY-----\n"
+```
+
+---
+
+## 📋 8. Loyihani Bajarish Rejasi (Action Plan)
+
+* [ ] **1-bosqich: Skelet va Konfiguratsiyalar** — Next.js loyihasi, Tailwind CSS, TypeScript va muhit sozlamalari.
+* [ ] **2-bosqich: Data & Yordamchi Modullar** — Viloyatlar, tovarlar ma'lumotlari va Telegram SDK integratsiyasi.
+* [ ] **3-bosqich: Frontend Mini App UI & Savat** — Katalog, Tovar modali, Savatcha va Telefon maskali Checkout formasi.
+* [ ] **4-bosqich: Backend API & Xavfsizlik** — `/api/order` endpointi, `initData` HMAC tekshiruvi.
+* [ ] **5-bosqich: CRM & Bot Xabarnomalari** — Google Sheets API orqali jadvalga yozish va Adminga Telegram orqali chiroyli chek jo'natish.
+* [ ] **6-bosqich: Telegram Bot Webhook** — `/api/bot` orqali `/start` va deep-link buyruqlarini ushlash, deploy qo'llanmasi.

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X, Check, Trash2, Tag, DollarSign, Image as ImageIcon, Sparkles, Layers } from 'lucide-react';
+import { X, Check, Trash2, Tag, Plus, Sparkles } from 'lucide-react';
 import { Product } from '@/lib/types';
 import { triggerHaptic } from '@/lib/telegram-client';
 
@@ -27,7 +27,7 @@ export function AdminProductModal({
   const [price, setPrice] = useState<number>(350000);
   const [oldPrice, setOldPrice] = useState<number | undefined>(undefined);
   const [discountPercent, setDiscountPercent] = useState<number | undefined>(undefined);
-  const [imageUrl, setImageUrl] = useState('');
+  const [imageUrls, setImageUrls] = useState<string[]>(['']);
   const [description, setDescription] = useState('');
   const [badge, setBadge] = useState<'New In' | 'Best Seller' | 'Flash Sale' | 'Hot' | ''>('New In');
   const [sizes, setSizes] = useState('S, M, L');
@@ -40,7 +40,7 @@ export function AdminProductModal({
       setPrice(productToEdit.price);
       setOldPrice(productToEdit.oldPrice);
       setDiscountPercent(productToEdit.discountPercent);
-      setImageUrl(productToEdit.images[0] || '');
+      setImageUrls(productToEdit.images.length > 0 ? productToEdit.images : ['']);
       setDescription(productToEdit.description || '');
       setBadge(productToEdit.badge || '');
       setSizes(productToEdit.sizes.join(', '));
@@ -52,7 +52,9 @@ export function AdminProductModal({
       setPrice(250000);
       setOldPrice(320000);
       setDiscountPercent(20);
-      setImageUrl('https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80');
+      setImageUrls([
+        'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=800&q=80',
+      ]);
       setDescription('');
       setBadge('New In');
       setSizes('S, M, L, XL');
@@ -81,9 +83,34 @@ export function AdminProductModal({
     }
   };
 
+  const handleAddImage = () => {
+    if (imageUrls.length < 5) {
+      triggerHaptic('light');
+      setImageUrls((prev) => [...prev, '']);
+    }
+  };
+
+  const handleUpdateImage = (index: number, val: string) => {
+    setImageUrls((prev) => {
+      const next = [...prev];
+      next[index] = val;
+      return next;
+    });
+  };
+
+  const handleRemoveImage = (index: number) => {
+    triggerHaptic('light');
+    if (imageUrls.length <= 1) {
+      setImageUrls(['']);
+      return;
+    }
+    setImageUrls((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !imageUrl.trim() || price <= 0) return;
+    const validImages = imageUrls.map((u) => u.trim()).filter(Boolean);
+    if (!title.trim() || validImages.length === 0 || price <= 0) return;
 
     triggerHaptic('success');
 
@@ -122,7 +149,7 @@ export function AdminProductModal({
       price,
       oldPrice: oldPrice && oldPrice > price ? oldPrice : undefined,
       discountPercent: discountPercent && discountPercent > 0 ? discountPercent : undefined,
-      images: [imageUrl.trim()],
+      images: validImages,
       rating: productToEdit ? productToEdit.rating : 4.9,
       reviewsCount: productToEdit ? productToEdit.reviewsCount : 1,
       sizes: cleanSizes.length > 0 ? cleanSizes : ['Standard'],
@@ -243,28 +270,57 @@ export function AdminProductModal({
             </div>
           )}
 
-          {/* Image URL */}
-          <div>
-            <label className="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">
-              Rasm Havolasi (URL) <span className="text-rose-500">*</span>
-            </label>
-            <div className="flex gap-2">
-              <input
-                type="url"
-                required
-                value={imageUrl}
-                onChange={(e) => setImageUrl(e.target.value)}
-                placeholder="https://... rasm linki"
-                className="flex-1 h-11 px-3.5 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100"
-              />
-              {imageUrl && (
-                <img
-                  src={imageUrl}
-                  alt="Preview"
-                  className="w-11 h-11 rounded-xl object-cover border border-zinc-200"
-                />
+          {/* Gallery Images (Up to 5 images) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="block font-bold text-zinc-700 dark:text-zinc-300">
+                Rasmlar Galereyasi ({imageUrls.length}/5) <span className="text-rose-500">*</span>
+              </label>
+              {imageUrls.length < 5 && (
+                <button
+                  type="button"
+                  onClick={handleAddImage}
+                  className="text-[11px] font-bold text-amber-500 hover:text-amber-400 flex items-center gap-1 active:scale-95"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>+ Yana rasm qoʻshish</span>
+                </button>
               )}
             </div>
+
+            {imageUrls.map((url, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <span className="text-[11px] font-bold text-zinc-400 w-4 text-center">{idx + 1}.</span>
+                <input
+                  type="url"
+                  required={idx === 0}
+                  value={url}
+                  onChange={(e) => handleUpdateImage(idx, e.target.value)}
+                  placeholder={idx === 0 ? "Asosiy rasm URL havolasi..." : `Qoʻshimcha ${idx + 1}-rasm URL...`}
+                  className="flex-1 h-10 px-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-100 text-xs"
+                />
+                {url && (
+                  <img
+                    src={url}
+                    alt={`Preview ${idx + 1}`}
+                    className="w-10 h-10 rounded-xl object-cover border border-zinc-200 shrink-0"
+                  />
+                )}
+                {imageUrls.length > 1 && (
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveImage(idx)}
+                    className="p-2 text-zinc-400 hover:text-rose-500 shrink-0"
+                    aria-label="Oʻchirish"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            ))}
+            <p className="text-[10px] text-zinc-500">
+              Galereyaga 5 tagacha rasm kiritishingiz mumkin. Xaridor ularni karuselda oʻngga-chapga surib koʻradi.
+            </p>
           </div>
 
           {/* Badge */}

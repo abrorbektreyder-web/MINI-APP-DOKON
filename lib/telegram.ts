@@ -119,11 +119,15 @@ export async function notifyAdminNewOrder(order: OrderSubmission) {
     return null;
   }
 
-  const itemsList = order.items
-    .map(
-      (item) =>
-        `• <b>${item.title}</b>\n  └ ${item.quantity} dona × ${item.price.toLocaleString('uz-UZ')} so'm [${item.size || 'Standard'} / ${item.color || 'Asosiy'}]`
-    )
+  const itemsList = (order.items || [])
+    .map((item) => {
+      const itemTitle = item.title || 'Mahsulot';
+      const itemQty = item.quantity || 1;
+      const itemPrice = typeof item.price === 'number' ? item.price.toLocaleString('uz-UZ') : '0';
+      const itemSize = item.size || (item as unknown as { selectedSize?: string })?.selectedSize || 'Standart';
+      const itemColor = item.color || (item as unknown as { selectedColor?: string })?.selectedColor || 'Asosiy';
+      return `• <b>${escapeHtml(itemTitle)}</b>\n  └ ${itemQty} dona × ${itemPrice} so'm [${escapeHtml(itemSize)} / ${escapeHtml(itemColor)}]`;
+    })
     .join('\n');
 
   const tgUsername = order.telegramUser?.username
@@ -132,25 +136,34 @@ export async function notifyAdminNewOrder(order: OrderSubmission) {
     ? `ID: ${order.telegramUser.id}`
     : `Mavjud emas`;
 
+  const customerName = order.customer?.fullName || (order.customer as unknown as { name?: string })?.name || 'Mijoz';
+  const customerPhone = order.customer?.phone || 'Mavjud emas';
+  const customerRegion = order.customer?.region || '';
+  const customerAddress = order.customer?.address || '';
+  const totalAmountNum = typeof order.totalAmount === 'number'
+    ? order.totalAmount
+    : typeof (order as unknown as { total?: number })?.total === 'number'
+    ? (order as unknown as { total: number }).total
+    : 0;
+
   const paymentText =
-    order.customer.paymentMethod === 'card_on_delivery'
+    order.customer?.paymentMethod === 'card_on_delivery'
       ? 'Karta orqali qabul qilinganda'
       : 'Naqd pul orqali qabul qilinganda';
 
   const message = `
 🔥 <b>YANGI BUYURTMA: ${order.id}</b>
 ━━━━━━━━━━━━━━━━━━
-👤 <b>Mijoz:</b> ${escapeHtml(order.customer.fullName)}
-📞 <b>Telefon:</b> <code>${escapeHtml(order.customer.phone)}</code>
-📍 <b>Viloyat:</b> ${escapeHtml(order.customer.region)}
-🏡 <b>Manzil:</b> ${escapeHtml(order.customer.address)}
+👤 <b>Mijoz:</b> ${escapeHtml(customerName)}
+📞 <b>Telefon:</b> <code>${escapeHtml(customerPhone)}</code>
+${customerRegion ? `📍 <b>Viloyat:</b> ${escapeHtml(customerRegion)}\n` : ''}🏡 <b>Manzil:</b> ${escapeHtml(customerAddress)}
 💬 <b>Telegram:</b> ${tgUsername}
 💳 <b>To'lov:</b> ${paymentText}
-${order.customer.comment ? `📝 <b>Izoh:</b> ${escapeHtml(order.customer.comment)}\n` : ''}
+${order.customer?.comment ? `📝 <b>Izoh:</b> ${escapeHtml(order.customer.comment)}\n` : ''}
 📦 <b>Buyurtma tarkibi:</b>
 ${itemsList}
 
-💰 <b>JAMI SUMMA:</b> <b>${order.totalAmount.toLocaleString('uz-UZ')} so'm</b>
+💰 <b>JAMI SUMMA:</b> <b>${totalAmountNum.toLocaleString('uz-UZ')} so'm</b>
 ━━━━━━━━━━━━━━━━━━
 ⏰ <b>Sana:</b> ${order.createdAt}
 Holat: 🟡 <b>Yangi buyurtma</b>
@@ -195,15 +208,26 @@ export async function sendCustomerOrderReceipt(order: OrderSubmission) {
   const customerTgId = order.telegramUser?.id;
   if (!customerTgId) return null;
 
+  const customerName = order.customer?.fullName || (order.customer as unknown as { name?: string })?.name || 'Mijoz';
+  const customerPhone = order.customer?.phone || 'Mavjud emas';
+  const customerRegion = order.customer?.region || '';
+  const customerAddress = order.customer?.address || '';
+  const totalAmountNum = typeof order.totalAmount === 'number'
+    ? order.totalAmount
+    : typeof (order as unknown as { total?: number })?.total === 'number'
+    ? (order as unknown as { total: number }).total
+    : 0;
+
+  const addressLine = [customerRegion, customerAddress].filter(Boolean).join(', ');
+
   const receipt = `
-🎉 <b>Hurmatli ${escapeHtml(order.customer.fullName)}!</b>
+🎉 <b>Hurmatli ${escapeHtml(customerName)}!</b>
 
 Sizning <b>${order.id}</b> raqamli buyurtmangiz muvaffaqiyatli qabul qilindi.
 
-📦 <b>Jami summa:</b> ${order.totalAmount.toLocaleString('uz-UZ')} so'm
-📍 <b>Yetkazish manzili:</b> ${escapeHtml(order.customer.region)}, ${escapeHtml(order.customer.address)}
-
-Operatorimiz tez orada siz bilan <code>${escapeHtml(order.customer.phone)}</code> raqami orqali bog'lanadi.
+📦 <b>Jami summa:</b> ${totalAmountNum.toLocaleString('uz-UZ')} so'm
+${addressLine ? `📍 <b>Yetkazish manzili:</b> ${escapeHtml(addressLine)}\n` : ''}
+Operatorimiz tez orada siz bilan <code>${escapeHtml(customerPhone)}</code> raqami orqali bog'lanadi.
 
 <b>LUXOR</b> do'konini tanlaganingiz uchun tashakkur! ✨
 `.trim();

@@ -4,7 +4,13 @@ import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { INITIAL_PRODUCTS } from '@/data/products';
 import { Product, CartItem } from '@/lib/types';
-import { initTelegram, triggerHaptic, getTelegramUser } from '@/lib/telegram-client';
+import {
+  initTelegram,
+  triggerHaptic,
+  isUserAdmin,
+  setAdminSession,
+  verifyAdminPin,
+} from '@/lib/telegram-client';
 import { Header } from '@/components/Header';
 import { HeroBanner } from '@/components/HeroBanner';
 import { FlashSaleBar } from '@/components/FlashSaleBar';
@@ -16,7 +22,17 @@ import { CheckoutModal } from '@/components/CheckoutModal';
 import { OrderSuccessModal } from '@/components/OrderSuccessModal';
 import { AdminProductModal } from '@/components/AdminProductModal';
 import { BottomNav, NavTab } from '@/components/BottomNav';
-import { Heart, SearchX, Sparkles, Plus, Settings, ShieldCheck } from 'lucide-react';
+import {
+  Heart,
+  SearchX,
+  Sparkles,
+  Plus,
+  Settings,
+  ShieldCheck,
+  KeyRound,
+  LogOut,
+  X,
+} from 'lucide-react';
 
 function LuxorStoreContent() {
   const searchParams = useSearchParams();
@@ -37,12 +53,15 @@ function LuxorStoreContent() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
+  const [isPinModalOpen, setIsPinModalOpen] = useState(false);
+  const [pinInput, setPinInput] = useState('');
+  const [pinError, setPinError] = useState('');
 
   // Initialize Telegram WebApp and check Admin status on mount
   useEffect(() => {
     initTelegram();
 
-    // Load custom products from localStorage if any
+    // 1. Instant load from localStorage
     try {
       const saved = localStorage.getItem('luxor_custom_products');
       if (saved) {
@@ -55,12 +74,40 @@ function LuxorStoreContent() {
       // fallback
     }
 
-    // Check if current user is Admin (6377333240 or URL parameter ?admin=true)
-    const tgUser = getTelegramUser();
-    const adminParam = searchParams.get('admin');
-    if (tgUser?.id === 6377333240 || adminParam === 'true' || adminParam === '6377333240') {
-      setIsAdmin(true);
-    }
+    // 2. Background sync from backend catalog API
+    fetch('/api/products')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+          setProducts(data.data);
+          try {
+            localStorage.setItem('luxor_custom_products', JSON.stringify(data.data));
+          } catch {}
+        }
+      })
+      .catch(() => {});
+
+    // 3. Multi-interval Admin verification to eliminate Webview race conditions
+    const runAdminCheck = () => {
+      if (isUserAdmin()) {
+        setIsAdmin(true);
+        return true;
+      }
+      return false;
+    };
+
+    runAdminCheck();
+    const t1 = setTimeout(runAdminCheck, 150);
+    const t2 = setTimeout(runAdminCheck, 450);
+    const t3 = setTimeout(runAdminCheck, 1200);
+    const t4 = setTimeout(runAdminCheck, 2500);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(t4);
+    };
   }, [searchParams]);
 
   // Deep-link handler: e.g. ?product=hk9pro or ?p=hk9pro
@@ -262,6 +309,16 @@ function LuxorStoreContent() {
         cartCount={cartItemsCount}
         wishlistCount={wishlistIds.length}
         searchQuery={searchQuery}
+        isAdmin={isAdmin}
+        onBrandClick={() => {
+          if (!isAdmin) {
+            setPinInput('');
+            setPinError('');
+            setIsPinModalOpen(true);
+          } else {
+            setIsAdminModalOpen(true);
+          }
+        }}
         onSearchChange={setSearchQuery}
         onOpenCart={() => setIsCartOpen(true)}
         onOpenWishlist={() => setActiveTab('wishlist')}
@@ -277,22 +334,36 @@ function LuxorStoreContent() {
                   <ShieldCheck className="w-4 h-4 stroke-[2.5]" />
                 </div>
                 <div>
-                  <div className="text-xs font-bold text-amber-400">Admin Rejimi Faol</div>
-                  <div className="text-[10px] text-zinc-400">Mahsulotlarni bevosita tahrirlashingiz mumkin</div>
+                  <div className="text-xs font-bold text-amber-400">Admin Rejimi Faol 👑</div>
+                  <div className="text-[10px] text-zinc-400">Mahsulotlarni bevosita boshqaring</div>
                 </div>
               </div>
 
-              <button
-                onClick={() => {
-                  triggerHaptic('medium');
-                  setProductToEdit(null);
-                  setIsAdminModalOpen(true);
-                }}
-                className="px-3 py-1.5 rounded-xl bg-amber-500 text-zinc-950 text-xs font-extrabold flex items-center gap-1.5 active:scale-95 shadow-sm"
-              >
-                <Plus className="w-3.5 h-3.5 stroke-[3]" />
-                <span>Qoʻshish</span>
-              </button>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => {
+                    triggerHaptic('medium');
+                    setProductToEdit(null);
+                    setIsAdminModalOpen(true);
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-amber-500 text-zinc-950 text-xs font-extrabold flex items-center gap-1.5 active:scale-95 shadow-sm"
+                >
+                  <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                  <span>Qoʻshish</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    triggerHaptic('light');
+                    setAdminSession(false);
+                    setIsAdmin(false);
+                  }}
+                  title="Admin rejimidan chiqish"
+                  className="p-1.5 rounded-xl bg-zinc-800 text-zinc-400 hover:text-white hover:bg-zinc-700 active:scale-95 transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -345,7 +416,9 @@ function LuxorStoreContent() {
                 <button
                   onClick={() => {
                     triggerHaptic('medium');
-                    setIsAdmin(true);
+                    setPinInput('');
+                    setPinError('');
+                    setIsPinModalOpen(true);
                   }}
                   className="p-1 text-zinc-300 dark:text-zinc-700 hover:text-zinc-500"
                   title="Admin rejimini yoqish"
@@ -467,6 +540,90 @@ function LuxorStoreContent() {
         orderId={orderSuccessId}
         onClose={() => setOrderSuccessId(null)}
       />
+
+      {/* Admin PIN Unlock Modal */}
+      {isPinModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-sm rounded-3xl bg-white dark:bg-zinc-900 p-6 shadow-2xl border border-zinc-100 dark:border-zinc-800 animate-scale-in">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
+                  <KeyRound className="w-5 h-5 stroke-[2.5]" />
+                </div>
+                <div>
+                  <h3 className="text-base font-extrabold text-zinc-900 dark:text-zinc-50">
+                    Admin Kirish
+                  </h3>
+                  <p className="text-xs text-zinc-500">
+                    Do‘kon egasi tasdiq kodi
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsPinModalOpen(false)}
+                className="p-1.5 rounded-full text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (verifyAdminPin(pinInput)) {
+                  setIsAdmin(true);
+                  setIsPinModalOpen(false);
+                  setPinInput('');
+                  setPinError('');
+                  triggerHaptic('success');
+                } else {
+                  setPinError('Noto‘g‘ri kod. Standart: 7777 yoki Admin Telegram ID');
+                  triggerHaptic('error');
+                }
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300 mb-1.5">
+                  PIN-kod yoki Admin ID:
+                </label>
+                <input
+                  type="password"
+                  autoFocus
+                  value={pinInput}
+                  onChange={(e) => {
+                    setPinInput(e.target.value);
+                    if (pinError) setPinError('');
+                  }}
+                  placeholder="Masalan: 7777"
+                  className="w-full h-12 px-4 rounded-xl text-center text-lg font-mono font-bold tracking-widest bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+                {pinError && (
+                  <p className="text-xs text-rose-500 mt-1.5 text-center font-medium">
+                    {pinError}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsPinModalOpen(false)}
+                  className="flex-1 h-11 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 text-sm font-bold active:scale-95"
+                >
+                  Bekor qilish
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 h-11 rounded-xl bg-amber-500 hover:bg-amber-600 text-zinc-950 text-sm font-black active:scale-95 shadow-md shadow-amber-500/20"
+                >
+                  Tasdiqlash
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

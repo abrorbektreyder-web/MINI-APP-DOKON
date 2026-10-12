@@ -8,6 +8,8 @@ interface HeaderProps {
   cartCount: number;
   wishlistCount: number;
   searchQuery: string;
+  isAdmin?: boolean;
+  onBrandClick?: () => void;
   onSearchChange: (query: string) => void;
   onOpenCart: () => void;
   onOpenWishlist: () => void;
@@ -17,6 +19,8 @@ export function Header({
   cartCount,
   wishlistCount,
   searchQuery,
+  isAdmin = false,
+  onBrandClick,
   onSearchChange,
   onOpenCart,
   onOpenWishlist,
@@ -26,11 +30,24 @@ export function Header({
       <div className="max-w-md mx-auto px-4 pt-3 pb-2.5">
         {/* Top brand & actions bar */}
         <div className="flex items-center justify-between gap-3 mb-2.5">
-          <div className="flex items-center gap-2">
+          <div
+            onClick={() => {
+              triggerHaptic('selection');
+              onBrandClick?.();
+            }}
+            className="flex items-center gap-2 cursor-pointer select-none"
+            role="button"
+            title={isAdmin ? 'Admin rejim faol' : 'Admin kirish'}
+          >
             <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
             <h1 className="text-2xl font-black tracking-[0.25em] text-zinc-900 dark:text-zinc-50 font-serif uppercase">
               LUXOR
             </h1>
+            {isAdmin && (
+              <span className="px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider rounded bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                ADMIN 👑
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-1.5">

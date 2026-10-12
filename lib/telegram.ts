@@ -1,3 +1,6 @@
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 import { OrderSubmission } from './types';
 
 const BOT_TOKEN =
@@ -6,6 +9,64 @@ const BOT_TOKEN =
   '8719208102:AAGcxrZ6CKXmHjt5yCCJpxWS2NJQQ7cIiiE';
 
 const ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID || '6377333240';
+const GROUP_CHAT_ID = process.env.TELEGRAM_GROUP_CHAT_ID || process.env.TELEGRAM_GROUP_ID || '';
+
+// In-memory runtime group storage
+let runtimeGroupId: string | number | null = null;
+const TMP_GROUP_FILE = path.join(os.tmpdir(), 'luxor_group_id.txt');
+
+export function setRuntimeGroupId(id: string | number): void {
+  runtimeGroupId = id;
+  try {
+    fs.writeFileSync(TMP_GROUP_FILE, String(id), 'utf-8');
+  } catch {
+    // ignore tmp write errors in read-only environments
+  }
+}
+
+export function getRuntimeGroupId(): string | number | null {
+  if (runtimeGroupId) return runtimeGroupId;
+  try {
+    if (fs.existsSync(TMP_GROUP_FILE)) {
+      const val = fs.readFileSync(TMP_GROUP_FILE, 'utf-8').trim();
+      if (val) {
+        runtimeGroupId = val;
+        return val;
+      }
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+/**
+ * Returns all recipient chat IDs (Admin private chat and configured groups)
+ */
+export function getRecipientChatIds(): (string | number)[] {
+  const ids = new Set<string | number>();
+
+  if (ADMIN_CHAT_ID) {
+    ADMIN_CHAT_ID.split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .forEach((id) => ids.add(id));
+  }
+
+  if (GROUP_CHAT_ID) {
+    GROUP_CHAT_ID.split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .forEach((id) => ids.add(id));
+  }
+
+  const dynGroup = getRuntimeGroupId();
+  if (dynGroup) {
+    ids.add(dynGroup);
+  }
+
+  return Array.from(ids);
+}
 
 /**
  * Sends a message via Telegram Bot API
@@ -37,19 +98,24 @@ export async function sendTelegramMessage(
       }),
     });
 
-    return await res.json();
+    const data = await res.json();
+    if (!data.ok) {
+      console.error(`Telegram sendMessage failed for chat ${chatId}:`, data);
+    }
+    return data;
   } catch (error) {
-    console.error('Error sending Telegram message:', error);
+    console.error(`Error sending Telegram message to ${chatId}:`, error);
     return null;
   }
 }
 
 /**
- * Sends a new order notification to the admin chat or group
+ * Sends a new order notification to the admin chat and group
  */
 export async function notifyAdminNewOrder(order: OrderSubmission) {
-  if (!ADMIN_CHAT_ID) {
-    console.warn('TELEGRAM_ADMIN_CHAT_ID is not configured.');
+  const recipientIds = getRecipientChatIds();
+  if (recipientIds.length === 0) {
+    console.warn('No Telegram admin or group chat IDs configured.');
     return null;
   }
 
@@ -90,20 +156,36 @@ ${itemsList}
 Holat: 🟡 <b>Yangi buyurtma</b>
 `.trim();
 
-  return await sendTelegramMessage(ADMIN_CHAT_ID, message, {
-    parse_mode: 'HTML',
-    reply_markup: {
-      inline_keyboard: [
-        [
-          { text: '✅ Qabul qilindi', callback_data: `status_accept_${order.id}` },
-          { text: '🚚 Yetkazilmoqda', callback_data: `status_shipping_${order.id}` },
-        ],
-        [
-          { text: '📞 Qoʻngʻiroq qilish', url: `tel:${order.customer.phone.replace(/[^0-9+]/g, '')}` },
-        ],
-      ],
-    },
-  });
+  // Telegram Inline Keyboard
+  // Note: Telegram rejects 'tel:' URLs in inline buttons with a 400 Bad Request error.
+  // Phone numbers are placed inside <code></code> tags in message body for instant tap-to-call/copy.
+  const inlineButtons: Array<Array<{ text: string; callback_data?: string; url?: string }>> = [
+    [
+      { text: '✅ Qabul qilindi', callback_data: `status_accept_${order.id}` },
+      { text: '🚚 Yetkazilmoqda', callback_data: `status_shipping_${order.id}` },
+    ],
+  ];
+
+  if (order.telegramUser?.username) {
+    inlineButtons.push([
+      {
+        text: '💬 Mijozga yozish',
+        url: `https://t.me/${order.telegramUser.username.replace('@', '')}`,
+      },
+    ]);
+  }
+
+  const sendPromises = recipientIds.map((targetId) =>
+    sendTelegramMessage(targetId, message, {
+      parse_mode: 'HTML',
+      reply_markup: {
+        inline_keyboard: inlineButtons,
+      },
+    })
+  );
+
+  const results = await Promise.allSettled(sendPromises);
+  return results;
 }
 
 /**

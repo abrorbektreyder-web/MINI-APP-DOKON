@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { setRuntimeGroupId } from '@/lib/telegram';
 
 const BOT_TOKEN =
   process.env.TELEGRAM_BOT_TOKEN ||
@@ -22,8 +23,15 @@ interface TelegramUpdate {
     chat: {
       id: number;
       type: string;
+      title?: string;
     };
     text?: string;
+    new_chat_members?: Array<{
+      id: number;
+      is_bot: boolean;
+      first_name: string;
+      username?: string;
+    }>;
   };
   callback_query?: {
     id: string;
@@ -51,23 +59,88 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // 1. Handle incoming user text messages
-    if (update.message?.text) {
-      const text = update.message.text.trim();
-      const chatId = update.message.chat.id;
-      const firstName = update.message.from.first_name || 'Xaridor';
+    // 1. Handle incoming user / group messages
+    if (update.message) {
+      const msg = update.message;
+      const chatId = msg.chat.id;
+      const chatType = msg.chat.type;
+      const text = msg.text ? msg.text.trim() : '';
+      const fromUsername = msg.from?.username?.toLowerCase();
+      const firstName = msg.from?.first_name || 'Xaridor';
 
+      // A) Handle Bot being added to a Telegram Group or Supergroup
+      if (msg.new_chat_members && Array.isArray(msg.new_chat_members)) {
+        const botWasAdded = msg.new_chat_members.some(
+          (m) => m.is_bot && (m.username === 'Luxordokon_bot' || m.id === 8719208102)
+        );
+        if (botWasAdded) {
+          setRuntimeGroupId(chatId);
+          await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text: `🎉 <b>LUXOR Savdo Boti guruhga muvaffaqiyatli ulandi!</b>\n\n📌 <b>Guruh Chat ID:</b> <code>${chatId}</code>\n\nEndi yangi tushgan barcha buyurtmalar ushbu guruhga avtomatik yetkaziladi. 🚀📦\n\n<i>Doimiy saqlash uchun Vercel'da <b>TELEGRAM_GROUP_CHAT_ID</b> = <code>${chatId}</code> qilib qo'yishingiz mumkin.</i>`,
+              parse_mode: 'HTML',
+            }),
+          });
+          return NextResponse.json({ ok: true });
+        }
+      }
+
+      // B) Handle group commands (/setgroup, /connect, /id, /start in a group)
+      if (chatType === 'group' || chatType === 'supergroup') {
+        if (
+          text.startsWith('/setgroup') ||
+          text.startsWith('/connect') ||
+          text.startsWith('/id') ||
+          text.startsWith('/start')
+        ) {
+          setRuntimeGroupId(chatId);
+          await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text: `✅ <b>Guruh muvaffaqiyatli ulandi!</b>\n\n📌 <b>Guruh Chat ID:</b> <code>${chatId}</code>\n\nEndi mijozlardan tushgan yangi buyurtmalar to'g'ridan-to'g'ri ushbu guruhga yuboriladi. 📦✨\n\n<i>Eslatma: Vercel Settings -> Environment Variables bo'limida <b>TELEGRAM_GROUP_CHAT_ID</b> = <code>${chatId}</code> qo'shsangiz sozlama umrbod saqlanadi.</i>`,
+              parse_mode: 'HTML',
+            }),
+          });
+          return NextResponse.json({ ok: true });
+        }
+      }
+
+      // C) Handle Private Chat messages (Admin or Customer)
       if (text.startsWith('/start')) {
+        const isOwner =
+          chatId === 6377333240 ||
+          String(chatId) === '6377333240' ||
+          fromUsername === 'abrorjon_dev';
+
         // Parse deep-link parameter: /start hk9pro -> param is hk9pro
         const parts = text.split(' ');
         const deepLinkParam = parts.length > 1 ? parts[1].replace('p_', '') : '';
 
         // Construct targeted Mini App URL
-        const webAppUrl = deepLinkParam
-          ? `${APP_URL}?product=${encodeURIComponent(deepLinkParam)}`
-          : APP_URL;
+        let webAppUrl = APP_URL;
+        if (isOwner) {
+          webAppUrl = deepLinkParam
+            ? `${APP_URL}?product=${encodeURIComponent(deepLinkParam)}&admin=6377333240`
+            : `${APP_URL}?admin=6377333240`;
+        } else if (deepLinkParam) {
+          webAppUrl = `${APP_URL}?product=${encodeURIComponent(deepLinkParam)}`;
+        }
 
-        const welcomeText = `
+        const welcomeText = isOwner
+          ? `
+Assalomu alaykum, <b>Hurmatli Do‘kon Egasi</b>! 👑
+
+<b>LUXOR</b> boshqaruv tizimiga xush kelibsiz!
+Siz do‘konga yangi mahsulotlar qo‘shishingiz, narx va chegirmalarni tahrirlashingiz hamda tovarlarni o‘chirishingiz mumkin.
+
+Pastdagi tugmani bosib, admin rejimida to‘liq boshqaring: 👇
+`.trim()
+          : `
 Assalomu alaykum, <b>${escapeHtml(firstName)}</b>! 👋
 
 <b>LUXOR</b> rasmiy do‘koniga xush kelibsiz! ✨
@@ -78,6 +151,10 @@ Eng sara smart-gadjetlar va premium tovarlar kafolatlangan sifat bilan siz uchun
 
 Katalogni ko‘rish va xarid qilish uchun pastdagi tugmani bosing: 👇
 `.trim();
+
+        const buttonText = isOwner
+          ? '🛍 Do‘konni Boshqarish (Admin) 👑'
+          : '🛍 Do‘konni Ochish ✨';
 
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
           method: 'POST',
@@ -90,7 +167,7 @@ Katalogni ko‘rish va xarid qilish uchun pastdagi tugmani bosing: 👇
               inline_keyboard: [
                 [
                   {
-                    text: '🛍 Do‘konni Ochish ✨',
+                    text: buttonText,
                     web_app: { url: webAppUrl },
                   },
                 ],

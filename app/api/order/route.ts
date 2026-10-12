@@ -54,6 +54,10 @@ export async function POST(req: NextRequest) {
       success: true,
       message: 'Buyurtma muvaffaqiyatli qabul qilindi',
       orderId: body.id,
+      diagnostic: {
+        adminNotification,
+        customerReceipt,
+      },
     });
   } catch (error) {
     console.error('Error in /api/order:', error);
@@ -62,4 +66,13 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+export async function GET() {
+  const { getRecipientChatIds } = await import('@/lib/telegram');
+  return NextResponse.json({
+    recipients: getRecipientChatIds(),
+    env_admin: process.env.TELEGRAM_ADMIN_CHAT_ID || null,
+    env_group: process.env.TELEGRAM_GROUP_CHAT_ID || null,
+  });
 }

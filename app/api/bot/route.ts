@@ -88,26 +88,53 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // B) Handle group commands (/setgroup, /connect, /id, /start in a group)
+      // B) Handle forwarded message from a group
+      if ((msg as any).forward_from_chat) {
+        const fwChat = (msg as any).forward_from_chat;
+        const forwardedChatId = fwChat.id;
+        const groupTitle = fwChat.title || 'Buyurtmalar guruhi';
+        setRuntimeGroupId(forwardedChatId);
+
+        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: `🎉 <b>"${groupTitle}" guruhi muvaffaqiyatli aniqlandi va ulandi!</b>\n\n📌 <b>Guruh Chat ID:</b> <code>${forwardedChatId}</code>\n\nEndi yangi tushgan barcha buyurtmalar to'g'ridan-to'g'ri ushbu guruhga boradi! 🚀📦`,
+            parse_mode: 'HTML',
+          }),
+        });
+        return NextResponse.json({ ok: true });
+      }
+
+      // C) Handle ANY message inside a Group or Supergroup
       if (chatType === 'group' || chatType === 'supergroup') {
-        if (
-          text.startsWith('/setgroup') ||
-          text.startsWith('/connect') ||
-          text.startsWith('/id') ||
-          text.startsWith('/start')
-        ) {
-          setRuntimeGroupId(chatId);
+        setRuntimeGroupId(chatId);
+
+        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: `✅ <b>"${msg.chat.title || 'LUXOR-BUYURTMALAR'}" guruhi ulandi!</b>\n\n📌 <b>Guruh Chat ID:</b> <code>${chatId}</code>\n\nEndi yangi buyurtmalar ushbu guruhga yuboriladi! 🚀📦`,
+            parse_mode: 'HTML',
+          }),
+        });
+
+        // Also notify the store owner in private chat
+        if (chatId !== 6377333240) {
           await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              chat_id: chatId,
-              text: `✅ <b>Guruh muvaffaqiyatli ulandi!</b>\n\n📌 <b>Guruh Chat ID:</b> <code>${chatId}</code>\n\nEndi mijozlardan tushgan yangi buyurtmalar to'g'ridan-to'g'ri ushbu guruhga yuboriladi. 📦✨\n\n<i>Eslatma: Vercel Settings -> Environment Variables bo'limida <b>TELEGRAM_GROUP_CHAT_ID</b> = <code>${chatId}</code> qo'shsangiz sozlama umrbod saqlanadi.</i>`,
+              chat_id: 6377333240,
+              text: `📢 <b>"${msg.chat.title || 'Guruh'}" guruhi ulandi!</b>\n\n📌 Guruh ID: <code>${chatId}</code>\nBuyurtmalar endi ushbu guruhga yetkaziladi.`,
               parse_mode: 'HTML',
             }),
           });
-          return NextResponse.json({ ok: true });
         }
+
+        return NextResponse.json({ ok: true });
       }
 
       // C) Handle Private Chat messages (Admin or Customer)

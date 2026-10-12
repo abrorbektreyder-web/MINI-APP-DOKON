@@ -1,13 +1,13 @@
 const BOT_TOKEN = '8719208102:AAGcxrZ6CKXmHjt5yCCJpxWS2NJQQ7cIiiE';
-const ADMIN_CHAT_ID = '6377333240';
+const CHANNEL_ID = -1003859670239;
 
 const message = `
-🔥 <b>YANGI BUYURTMA: #ORD-9999</b>
+🔥 <b>YANGI BUYURTMA: #ORD-7777</b>
 ━━━━━━━━━━━━━━━━━━
 👤 <b>Mijoz:</b> Abrorbek
 📞 <b>Telefon:</b> <code>+998901234567</code>
 📍 <b>Viloyat:</b> Toshkent shahri
-🏡 <b>Manzil:</b> Chilonzor
+🏡 <b>Manzil:</b> Chilonzor tumani
 💬 <b>Telegram:</b> @abrorjon_dev
 💳 <b>To'lov:</b> Naqd pul orqali qabul qilinganda
 
@@ -17,7 +17,7 @@ const message = `
 
 💰 <b>JAMI SUMMA:</b> <b>360 000 so'm</b>
 ━━━━━━━━━━━━━━━━━━
-⏰ <b>Sana:</b> 12.10.2026, 13:45
+⏰ <b>Sana:</b> 12.10.2026, 15:07
 Holat: 🟡 <b>Yangi buyurtma</b>
 `.trim();
 
@@ -26,14 +26,14 @@ async function run() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      chat_id: ADMIN_CHAT_ID,
+      chat_id: CHANNEL_ID,
       text: message,
       parse_mode: 'HTML',
       reply_markup: {
         inline_keyboard: [
           [
-            { text: '✅ Qabul qilindi', callback_data: 'status_accept_ORD-9999' },
-            { text: '🚚 Yetkazilmoqda', callback_data: 'status_shipping_ORD-9999' }
+            { text: '✅ Qabul qilindi', callback_data: 'status_accept_ORD-7777' },
+            { text: '🚚 Yetkazilmoqda', callback_data: 'status_shipping_ORD-7777' }
           ],
           [
             { text: '💬 Mijoz bilan yozishish', url: 'https://t.me/abrorjon_dev' }

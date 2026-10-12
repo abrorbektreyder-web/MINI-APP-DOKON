@@ -9,7 +9,7 @@ const BOT_TOKEN =
   '8719208102:AAGcxrZ6CKXmHjt5yCCJpxWS2NJQQ7cIiiE';
 
 const ADMIN_CHAT_ID = process.env.TELEGRAM_ADMIN_CHAT_ID || '6377333240';
-const GROUP_CHAT_ID = process.env.TELEGRAM_GROUP_CHAT_ID || process.env.TELEGRAM_GROUP_ID || '';
+const GROUP_CHAT_ID = process.env.TELEGRAM_GROUP_CHAT_ID || process.env.TELEGRAM_GROUP_ID || '-1003859670239';
 
 // In-memory runtime group storage
 let runtimeGroupId: string | number | null = null;
